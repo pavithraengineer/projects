@@ -1,0 +1,135 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
+#include <WiFiClientSecureBearSSL.h>
+#define RST_PIN  0
+#define SS_PIN   2
+int BUZZER = 16;  
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+MFRC522::MIFARE_Key key;  
+MFRC522::StatusCode status;      
+int blockNum = 2;  
+int trigger = 5;     //D1
+int echo = 4;        //D2
+byte bufferLen = 18;
+byte readBlockData[18];
+String card_holder_name;
+const String sheet_url = "https://script.google.com/macros/s/AKfycbxWuUoFd8nUirbryFeVuA_S06IpdA1PrColJYEbeJX9srd1ktXreXhBqkfK6HK43Nc/exec?name=";
+const uint8_t fingerprint[20] = {0x0F, 0xCF, 0x7E, 0xEA, 0xe48, 0x8A, 0x28, 0xBA, 0x74, 0xD9, 0xB5, 0x3E, 0xD4, 0x54, 0x5D, 0x2A, 0xF7, 0x0D, 0x82, 0xE2};
+//0F CF 7E EA 48 8A 28 BA 74 D9 B5 3E D4 54 5D 2A F7 0D 82 E2
+#define WIFI_SSID "Pavzz"
+#define WIFI_PASSWORD "12345678"
+void setup()
+{
+  
+  Serial.begin(9600);
+  //WiFi Connectivity
+    pinMode(echo, INPUT);
+  pinMode(trigger, OUTPUT);
+  Serial.println();
+  Serial.print("Connecting to AP");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED){
+    Serial.print(".");
+    delay(200);
+  }
+  Serial.println("");
+  Serial.println("WiFi connected.");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  Serial.println();
+  pinMode(BUZZER, OUTPUT);
+  SPI.begin();
+}
+ void loop()
+{
+ digitalWrite(trigger, LOW);
+ delayMicroseconds(2);
+ digitalWrite(trigger, HIGH);
+ delayMicroseconds(5);
+ digitalWrite(trigger, LOW);
+ int duration = pulseIn(echo, HIGH);
+ int distance = (duration * 0.034)/2;
+
+ Serial.print("Distance");
+ Serial.println(distance);
+
+  if (distance<18){
+    digitalWrite(BUZZER,HIGH);
+    delay(500);
+  }
+  else if (distance>18){
+    digitalWrite(BUZZER,LOW);
+  }
+
+  if ( ! mfrc522.PICC_IsNewCardPresent()) {return;}
+  
+  if ( ! mfrc522.PICC_ReadCardSerial()) {return;}
+  Serial.println();
+  Serial.println(F("Reading last data from RFID..."));
+  ReadDataFromBlock(blockNum, readBlockData);
+  Serial.println();
+  Serial.print(F("Last data in RFID:"));
+  Serial.print(blockNum);
+  Serial.print(F(" --> "));
+  for (int j=0 ; j<16 ; j++)
+  {
+    Serial.write(readBlockData[j]);
+  }
+  Serial.println();
+  if (WiFi.status() == WL_CONNECTED) {
+    
+    std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+    client->setFingerprint(fingerprint);
+    card_holder_name = sheet_url + String((char*)readBlockData);
+    card_holder_name.trim();
+    Serial.println(card_holder_name);
+    HTTPClient https;
+    Serial.print(F("[HTTPS] begin...\n"));
+  
+    if (https.begin(*client, (String)card_holder_name)){
+      Serial.print(F("[HTTPS] GET...\n"));
+      int httpCode = https.GET();
+      if (httpCode > 0) {
+        Serial.printf("[HTTPS] GET... code: %d\n", httpCode);
+      }
+      else 
+      {Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());}
+      //-----------------------------------------------------------------
+      https.end();
+      delay(1000);
+    }
+    else {
+      Serial.printf("[HTTPS} Unable to connect\n");
+    }
+    
+  }
+  
+}
+
+
+void ReadDataFromBlock(int blockNum, byte readBlockData[]) 
+{ 
+  for (byte i = 0; i < 6; i++) {
+    key.keyByte[i] = 0xFF;
+  }
+  if (status != MFRC522::STATUS_OK){
+     Serial.print("Authentication failed for Read: ");
+     Serial.println(mfrc522.GetStatusCodeName(status));
+     return;
+  }
+  else {
+    Serial.println("Authentication success");
+  }
+  status = mfrc522.MIFARE_Read(blockNum, readBlockData, &bufferLen);
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print("Reading failed: ");
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return;
+  }
+    Serial.println("Block was read successfully");  
+  }
+}
