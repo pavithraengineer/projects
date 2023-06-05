@@ -1,0 +1,159 @@
+#define BLYNK_TEMPLATE_ID "TMPLcj6NZbQn"
+#define BLYNK_DEVICE_NAME "Fire Extinguisher Robot"
+#define BLYNK_AUTH_TOKEN "YWq0TUrPRZr2vA-FHs47Q_Xw8vw-Xq7u"
+#define BLYNK_PRINT Serial
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+ 
+//Motor PINs
+#define ENA 0
+#define IN1 15
+#define IN2 13
+#define IN3 12
+#define IN4 14
+#define ENB 0
+#define Relay 16
+int gas=4;
+int flame=5;
+int sensorVal1; 
+int sensorVal2; 
+bool forward = 0;
+bool backward = 0;
+bool left = 0;
+bool right = 0;
+int Speed;
+int PumpMotor = 0;
+char auth[] = "YWq0TUrPRZr2vA-FHs47Q_Xw8vw-Xq7u"; //Enter your Blynk application auth token
+char ssid[] = "temp"; //Enter your WIFI name
+char pass[] = "temp12345"; //Enter your WIFI passowrd
+
+BlynkTimer timer; 
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(Relay, OUTPUT);
+  pinMode(gas, INPUT);
+  pinMode(flame, INPUT);
+  Blynk.begin(auth, ssid, pass);
+    timer.setInterval(1000L, getSendData1);
+     timer.setInterval(1000L, getSendData2); 
+}
+ 
+BLYNK_WRITE(V0) {
+  forward = param.asInt();
+}
+ 
+BLYNK_WRITE(V1) {
+  backward = param.asInt();
+}
+ 
+BLYNK_WRITE(V2) {
+  left = param.asInt();
+}
+ 
+BLYNK_WRITE(V3) {
+  right = param.asInt();
+}
+ 
+BLYNK_WRITE(V5) {
+  Speed = param.asInt();
+}
+
+BLYNK_WRITE(V6) {
+  PumpMotor = param.asInt();
+}
+
+void smartcar() {
+  if (forward == 1) {
+    carforward();
+    Serial.println("carforward");
+  } else if (backward == 1) {
+    carbackward();
+    Serial.println("carbackward");
+  } else if (left == 1) {
+    carturnleft();
+    Serial.println("carfleft");
+  } else if (right == 1) {
+    carturnright();
+    Serial.println("carright");
+  } else if (forward == 0 && backward == 0 && left == 0 && right == 0) {
+    carStop();
+    Serial.println("carstop");
+  }
+}
+
+void loop() {
+  Blynk.run();
+  smartcar();
+  getSendData1();
+  getSendData2();
+if (PumpMotor == 1) {
+  digitalWrite(Relay,HIGH);
+  Serial.println("Pump On");
+  delay(1000);
+}
+    sensorVal1 = analogRead(gas); 
+        Serial.print("sensorgasVal :");
+    Serial.println(sensorVal1);
+    sensorVal2 = analogRead(flame); 
+        Serial.print("sensorflameVal :");
+    Serial.println(sensorVal2);
+      timer.run(); 
+}
+
+void getSendData1()
+{
+int data1 = analogRead(gas); 
+  Blynk.virtualWrite(V7, data1);
+}
+
+void getSendData2()
+{
+int data2 = analogRead(flame); 
+  Blynk.virtualWrite(V8, data2);
+}
+ 
+void carforward() {
+  analogWrite(ENA, Speed);
+  analogWrite(ENB, Speed);
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+}
+void carbackward() {
+  analogWrite(ENA, Speed);
+  analogWrite(ENB, Speed);
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+}
+void carturnleft() {
+  analogWrite(ENA, Speed);
+  analogWrite(ENB, Speed);
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+}
+void carturnright() {
+  analogWrite(ENA, Speed);
+  analogWrite(ENB, Speed);
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+}
+void carStop() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+}
